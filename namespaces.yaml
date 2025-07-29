@@ -1,0 +1,80 @@
+---
+# Namespace para el monitor
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    name: monitoring
+    environment: production
+---
+# Namespace para los servicios bancarios
+aapiVersion: v1
+kind: Namespace
+metadata:
+  name: banco
+  labels:
+    name: banco
+    environment: production
+---
+# Namespace para los servicios bancarios en nodos spot
+aapiVersion: v1
+kind: Namespace
+metadata:
+  name: banco-spot
+  labels:
+    name: banco-spot
+    environment: production
+    spot: "true"
+---
+# NetworkPolicy para aislar los namespaces
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: banco
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+# NetworkPolicy para permitir tráfico de Prometheus
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus
+  namespace: banco
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+---
+# NetworkPolicy para el namespace spot
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-banco-to-spot
+  namespace: banco-spot
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: banco
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring

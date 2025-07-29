@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spot-mover
+  namespace: monitoring # Asegúrate de que este sea el mismo namespace donde desplegarás el CronJob
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: spot-mover-patcher
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["list", "patch"]
+- apiGroups: [""] # Para obtener información de pods si fuera necesario
+  resources: ["pods", "services"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: spot-mover-binding
+subjects:
+- kind: ServiceAccount
+  name: spot-mover
+  namespace: monitoring # Mismo namespace que el ServiceAccount
+roleRef:
+  kind: ClusterRole
+  name: spot-mover-patcher
+  apiGroup: rbac.authorization.k8s.io

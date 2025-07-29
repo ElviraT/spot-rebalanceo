@@ -1,0 +1,149 @@
+---
+# Configuración para el deployment de ejemplo en el namespace banco
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: servicio-bancario
+  namespace: banco
+  labels:
+    app: servicio-bancario
+    tier: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: servicio-bancario
+  template:
+    metadata:
+      labels:
+        app: servicio-bancario
+        tier: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+      - name: servicio-bancario
+        image: nginx:stable  # Reemplazar con la imagen real del servicio
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+# Servicio para el deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: servicio-bancario
+  namespace: banco
+  labels:
+    app: servicio-bancario
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+  selector:
+    app: servicio-bancario
+  type: ClusterIP
+---
+# Configuración para el deployment en nodos spot
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: servicio-bancario-spot
+  namespace: banco-spot
+  labels:
+    app: servicio-bancario
+    tier: backend
+    spot: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: servicio-bancario
+      spot: "true"
+  template:
+    metadata:
+      labels:
+        app: servicio-bancario
+        tier: backend
+        spot: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/lifecycle: spot
+      tolerations:
+      - key: "node.kubernetes.io/unschedulable"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: servicio-bancario
+        image: nginx:stable  # Reemplazar con la imagen real del servicio
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+# Horizontal Pod Autoscaler para el servicio regular
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: servicio-bancario-hpa
+  namespace: banco
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: servicio-bancario
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

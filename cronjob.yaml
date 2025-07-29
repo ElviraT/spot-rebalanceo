@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: spot-mover-cron
+  namespace: monitoring
+spec:
+  # --- INICIO CAMBIO PARA DEMO (COMENTAR/DESCOMENTAR SEGÚN NECESITES) ---
+  # schedule: "0 2 * * *"      # ORIGINAL: cada día a las 02:00
+  schedule: "* * * * *"      # PARA DEMO: cada minuto
+  # --- FIN CAMBIO PARA DEMO ---
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: spot-mover
+          restartPolicy: OnFailure
+          containers:
+            - name: spot-mover
+              image: elvirateran/spot-mover:latest  # Asegúrate de que sea tu usuario de Docker Hub
+              imagePullPolicy: Always
+              env:
+                - name: PROMETHEUS_URL
+                  value: "http://prometheus-kube-prometheus-prometheus.monitoring:9090" # URL del servicio Prometheus
