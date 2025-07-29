@@ -5,13 +5,7 @@ from kubernetes import client, config
 # 1. Config  
 PROM_URL = os.getenv("PROMETHEUS_URL", "http://prometheus-kube-prometheus-prometheus.monitoring:9090") 
 
-# --- INICIO CAMBIO PARA DEMO (COMENTAR/DESCOMENTAR SEGÚN NECESITES) ---
-# CONSULTA ORIGINAL (producción - busca servicios inactivos por 7 días)
-# QUERY    = 'increase(http_requests_total[7d]) == 0'
-
-# CONSULTA PARA DEMO (hace que el script SIEMPRE intente parchear 'nginx-demo' si está corriendo)
-QUERY    = 'kube_deployment_status_replicas_available{deployment="nginx-demo"} > 0'
-# --- FIN CAMBIO PARA DEMO ---
+QUERY    = 'increase(http_requests_total[7d]) == 0'
 
 def get_idle_services():
     """Obtiene una lista de servicios inactivos de Prometheus."""
@@ -21,14 +15,7 @@ def get_idle_services():
         results = resp.json()["data"]["result"]
         idle = []
         for item in results:
-            # --- INICIO CAMBIO PARA DEMO (COMENTAR/DESCOMENTAR SEGÚN NECESITES) ---
-            # Para la consulta original (http_requests_total), usa 'service'
-            # svc = item["metric"].get("service")
-            
-            # Para la consulta de DEMO (kube_deployment_status_replicas_available), usa 'deployment'
-            svc = item["metric"].get("deployment") 
-            # --- FIN CAMBIO PARA DEMO ---
-
+            svc = item["metric"].get("service")
             ns  = item["metric"].get("namespace", "default")
             if svc:
                 idle.append((ns, svc))
@@ -43,10 +30,12 @@ def get_idle_services():
 def move_to_spot(namespace, svc_name):
     """Parchea un deployment para moverlo a nodos spot."""
     api = client.AppsV1Api()
-    # Usamos el nombre del deployment directamente ya que la consulta de DEMO lo devuelve como tal
+    # Asume que el nombre del Deployment es el mismo que el nombre del servicio
     deployment_name = svc_name 
     try:
-        # No necesitamos listar por selector si ya tenemos el nombre directo
+        # Encontrar el Deployment asociado al servicio. 
+        # Esto puede requerir una lógica más compleja si el nombre del servicio no coincide directamente con el del deployment.
+        # Por ahora, asumimos que coinciden para simplificar.
         d = api.read_namespaced_deployment(deployment_name, namespace)
         
         patch = {
@@ -79,9 +68,9 @@ def main():
     idle_services = get_idle_services()
     
     if not idle_services:
-        print("🚀 Todos los servicios tienen tráfico. No hay nada que mover (o no se encontró el deployment de demo).")
+        print("🚀 Todos los servicios tienen tráfico. No hay nada que mover.")
     else:
-        print(f"Servicios inactivos encontrados (para demo): {idle_services}")
+        print(f"Servicios inactivos encontrados: {idle_services}")
         for ns, svc in idle_services:
             move_to_spot(ns, svc)
             
