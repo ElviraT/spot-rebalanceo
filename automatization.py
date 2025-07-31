@@ -3,23 +3,32 @@ import requests
 from kubernetes import client, config
 import datetime
 
-# 1. Config  
-PROM_URL = os.getenv("PROMETHEUS_URL", "http://prometheus-kube-prometheus-prometheus.monitoring:9090") 
-
-# Reemplaza la consulta de 7 días (la comentas)
-# QUERY    = 'increase(http_requests_total[7d]) == 0'
-
-# Usa esta consulta para la demo. Busca si hay réplicas disponibles de 'servicio-bancario'
+# 1. Config
+PROM_URL = os.getenv("PROMETHEUS_URL", "http://prometheus-kube-prometheus-prometheus.monitoring:9090")
 QUERY    = 'kube_deployment_status_replicas_available{deployment="servicio-bancario", namespace="banco"} == 3'
 
-# También modifica la función para que use la etiqueta 'deployment' en lugar de 'service'
 def get_idle_services():
-    # ...
-    for item in results:
-        svc = item["metric"].get("deployment") # <-- CAMBIO AQUÍ
-        ns  = item["metric"].get("namespace", "default")
-        if svc:
-            idle.append((ns, svc))
+    idle = []
+    
+    try:
+        # Realizar la consulta a Prometheus
+        params = {"query": QUERY}
+        response = requests.get(f"{PROM_URL}/api/v1/query", params=params)
+        response.raise_for_status()
+        result = response.json()["data"]["result"]
+
+        for item in result:
+            svc = item["metric"].get("deployment")
+            ns  = item["metric"].get("namespace", "default")
+            if svc:
+                idle.append((ns, svc))
+    except requests.exceptions.RequestException as e:
+        print(f"Error al conectar con Prometheus: {e}")
+        return []
+    except KeyError as e:
+        print(f"Error al analizar la respuesta de Prometheus: {e}")
+        return []
+
     return idle
 
 def move_to_spot(namespace, svc_name):
