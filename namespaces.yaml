@@ -9,7 +9,7 @@ metadata:
     environment: production
 ---
 # Namespace para los servicios bancarios
-aapiVersion: v1
+apiVersion: v1
 kind: Namespace
 metadata:
   name: banco
@@ -18,7 +18,7 @@ metadata:
     environment: production
 ---
 # Namespace para los servicios bancarios en nodos spot
-aapiVersion: v1
+apiVersion: v1
 kind: Namespace
 metadata:
   name: banco-spot
