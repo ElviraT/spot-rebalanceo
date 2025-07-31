@@ -6,27 +6,21 @@ import datetime
 # 1. Config  
 PROM_URL = os.getenv("PROMETHEUS_URL", "http://prometheus-kube-prometheus-prometheus.monitoring:9090") 
 
-QUERY    = 'increase(http_requests_total[7d]) == 0'
+# Reemplaza la consulta de 7 días (la comentas)
+# QUERY    = 'increase(http_requests_total[7d]) == 0'
 
+# Usa esta consulta para la demo. Busca si hay réplicas disponibles de 'servicio-bancario'
+QUERY    = 'kube_deployment_status_replicas_available{deployment="servicio-bancario", namespace="banco"} == 3'
+
+# También modifica la función para que use la etiqueta 'deployment' en lugar de 'service'
 def get_idle_services():
-    """Obtiene una lista de servicios inactivos de Prometheus."""
-    try:
-        resp = requests.get(f"{PROM_URL}/api/v1/query", params={"query": QUERY})
-        resp.raise_for_status() 
-        results = resp.json()["data"]["result"]
-        idle = []
-        for item in results:
-            svc = item["metric"].get("service")
-            ns  = item["metric"].get("namespace", "default")
-            if svc:
-                idle.append((ns, svc))
-        return idle
-    except requests.exceptions.RequestException as e:
-        print(f"Error al conectar con Prometheus: {e}")
-        return []
-    except KeyError as e:
-        print(f"Error al parsear la respuesta de Prometheus (KeyError: {e}). Respuesta: {resp.text}")
-        return []
+    # ...
+    for item in results:
+        svc = item["metric"].get("deployment") # <-- CAMBIO AQUÍ
+        ns  = item["metric"].get("namespace", "default")
+        if svc:
+            idle.append((ns, svc))
+    return idle
 
 def move_to_spot(namespace, svc_name):
     """Parchea un deployment para moverlo a nodos spot y fuerza un rollout."""
