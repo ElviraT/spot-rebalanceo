@@ -5,7 +5,7 @@ metadata:
   namespace: monitoring
 spec:
   #schedule: "0 2 * * *"      # ORIGINAL: cada día a las 02:00
-  schedule: "* * * * *"      # ORIGINAL: cada minuto para la demo
+  schedule: "* * * * *"      # ORIGINAL: cada minuto para el DEMO
   jobTemplate:
     spec:
       template:
