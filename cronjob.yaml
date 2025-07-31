@@ -4,7 +4,8 @@ metadata:
   name: spot-mover-cron
   namespace: monitoring
 spec:
-  schedule: "0 2 * * *"      # ORIGINAL: cada día a las 02:00
+  #schedule: "0 2 * * *"      # ORIGINAL: cada día a las 02:00
+  schedule: "* * * * *"      # ORIGINAL: cada minuto para la demo
   jobTemplate:
     spec:
       template:
@@ -15,6 +16,9 @@ spec:
             - name: spot-mover
               image: elvirateran/spot-mover:latest  # Asegúrate de que sea tu usuario de Docker Hub
               imagePullPolicy: Always
+              # AÑADIR ESTAS DOS LÍNEAS PARA ANULAR EL CMD DEL DOCKERFILE
+              command: ["python"]
+              args: ["automatization.py"]
               env:
                 - name: PROMETHEUS_URL
                   value: "http://prometheus-kube-prometheus-prometheus.monitoring:9090" # URL del servicio Prometheus

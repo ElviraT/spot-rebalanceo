@@ -1,6 +1,7 @@
 import os
 import requests
 from kubernetes import client, config
+import datetime
 
 # 1. Config  
 PROM_URL = os.getenv("PROMETHEUS_URL", "http://prometheus-kube-prometheus-prometheus.monitoring:9090") 
@@ -28,17 +29,12 @@ def get_idle_services():
         return []
 
 def move_to_spot(namespace, svc_name):
-    """Parchea un deployment para moverlo a nodos spot."""
+    """Parchea un deployment para moverlo a nodos spot y fuerza un rollout."""
     api = client.AppsV1Api()
-    # Asume que el nombre del Deployment es el mismo que el nombre del servicio
     deployment_name = svc_name 
     try:
-        # Encontrar el Deployment asociado al servicio. 
-        # Esto puede requerir una lógica más compleja si el nombre del servicio no coincide directamente con el del deployment.
-        # Por ahora, asumimos que coinciden para simplificar.
-        d = api.read_namespaced_deployment(deployment_name, namespace)
-        
-        patch = {
+        # Parche 1: Añadir el nodeSelector para los nuevos pods
+        patch_node_selector = {
             "spec": {
                 "template": {
                     "spec": {
@@ -49,8 +45,26 @@ def move_to_spot(namespace, svc_name):
                 }
             }
         }
-        api.patch_namespaced_deployment(d.metadata.name, namespace, patch)
-        print(f"→ Deployment '{d.metadata.name}' en namespace '{namespace}' parcheado para nodos spot.")
+        api.patch_namespaced_deployment(deployment_name, namespace, patch_node_selector)
+        print(f"→ Deployment '{deployment_name}' en namespace '{namespace}' parcheado con nodeSelector 'spot'.")
+
+        # Parche 2: Forzar un rollout actualizando una anotación con un timestamp
+        # Esto reiniciará todos los pods existentes para que sean reprogramados en los nodos spot.
+        now = datetime.datetime.utcnow().isoformat("T") + "Z"
+        patch_rollout = {
+            "spec": {
+                "template": {
+                    "metadata": {
+                        "annotations": {
+                            "kubectl.kubernetes.io/restartedAt": now
+                        }
+                    }
+                }
+            }
+        }
+        api.patch_namespaced_deployment(deployment_name, namespace, patch_rollout)
+        print(f"→ Rollout del Deployment '{deployment_name}' en namespace '{namespace}' iniciado.")
+
     except client.ApiException as e:
         print(f"Error de Kubernetes al parchear deployment '{deployment_name}' en '{namespace}': {e}")
     except Exception as e:
