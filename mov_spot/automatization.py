@@ -3,22 +3,33 @@ import requests
 from kubernetes import client, config
 import datetime
 
-# 1. Config
+# 1. Configuración
 PROM_URL = os.getenv("PROMETHEUS_URL", "http://prometheus-kube-prometheus-prometheus.monitoring:9090")
-QUERY    = 'kube_deployment_status_replicas_available{deployment="servicio-bancario", namespace="banco"} == 3'
+
+# --- INICIO CAMBIO PARA DEMO (COMENTAR/DESCOMENTAR SEGÚN NECESITES) ---
+# CONSULTA ORIGINAL (producción - busca servicios inactivos por 7 días)
+# QUERY    = 'increase(http_requests_total[7d]) == 0'
+
+# CONSULTA PARA DEMO (hace que el script SIEMPRE intente parchear 'nginx-demo' si está corriendo)
+QUERY    = 'kube_deployment_status_replicas_available{deployment="nginx-demo"} > 0'
+# --- FIN CAMBIO PARA DEMO ---
 
 def get_idle_services():
+    """Obtiene una lista de servicios inactivos de Prometheus."""
     idle = []
-    
     try:
-        # Realizar la consulta a Prometheus
-        params = {"query": QUERY}
-        response = requests.get(f"{PROM_URL}/api/v1/query", params=params)
-        response.raise_for_status()
-        result = response.json()["data"]["result"]
+        resp = requests.get(f"{PROM_URL}/api/v1/query", params={"query": QUERY})
+        resp.raise_for_status() 
+        results = resp.json()["data"]["result"]
+        for item in results:
+            # --- INICIO CAMBIO PARA DEMO (COMENTAR/DESCOMENTAR SEGÚN NECESITES) ---
+            # Para la consulta original (http_requests_total), usa 'service'
+            # svc = item["metric"].get("service")
+            
+            # Para la consulta de DEMO (kube_deployment_status_replicas_available), usa 'deployment'
+            svc = item["metric"].get("deployment") 
+            # --- FIN CAMBIO PARA DEMO ---
 
-        for item in result:
-            svc = item["metric"].get("deployment")
             ns  = item["metric"].get("namespace", "default")
             if svc:
                 idle.append((ns, svc))
@@ -77,8 +88,17 @@ def main():
     """Función principal para obtener servicios inactivos y moverlos a spot."""
     try:
         config.load_incluster_config()
+        print("Configuración de Kubernetes cargada desde el clúster.")
     except config.ConfigException:
         print("No se pudo cargar la configuración in-cluster. ¿El script está corriendo dentro de un pod de Kubernetes?")
+        # --- INICIO CAMBIO PARA AKS (COMENTAR/DESCOMENTAR SEGÚN NECESITES) ---
+        # try:
+        #     config.load_kube_config()
+        #     print("Configuración de Kubernetes cargada desde un archivo kubeconfig.")
+        # except config.ConfigException:
+        #     print("No se pudo cargar la configuración de Kubernetes. Asegúrate de estar en un clúster o tener un archivo kubeconfig válido.")
+        #     return
+        # --- FIN CAMBIO PARA AKS ---
         return
 
     print(f"Conectando a Prometheus en: {PROM_URL}")
